@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="description" content="Fast offline-first money tracker with customizable amount and category panels.">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icons/icon-192.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon-192.svg">
+  <link rel="stylesheet" href="style.css">
+  <title>Money Tracker</title>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="hero">
+      <div>
+        <p class="eyebrow">Offline-ready PWA</p>
+        <h1>Money Tracker</h1>
+        <p class="hero-copy">Tap fast, stay organized, and keep your custom setup saved on this device.</p>
+      </div>
+      <button id="installButton" class="ghost-button hidden" type="button">Install App</button>
+    </header>
+
+    <main class="stack">
+      <section class="panel accent-panel" aria-labelledby="totalHeading">
+        <div class="panel-header">
+          <div>
+            <p class="panel-label">Current session</p>
+            <h2 id="totalHeading">Live total</h2>
+          </div>
+          <button id="clearAllButton" class="ghost-button danger-button" type="button">Clear All</button>
+        </div>
+        <div class="total-card">
+          <div class="total-row">
+            <span class="total-label">Amount</span>
+            <strong id="totalValue" class="total-value">0</strong>
+          </div>
+          <div class="total-meta">
+            <span id="selectionSummary">No amounts selected yet.</span>
+            <span id="selectedCategoryText">No category selected.</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="amountPanelHeading">
+        <div class="panel-header">
+          <div>
+            <p class="panel-label">Section 1</p>
+            <h2 id="amountPanelHeading">Amount Selection</h2>
+          </div>
+          <button id="toggleAmountEdit" class="icon-button" type="button" aria-expanded="false" aria-controls="amountEditor">
+            <span aria-hidden="true">✎</span>
+            <span>Edit</span>
+          </button>
+        </div>
+        <div id="amountButtons" class="chip-grid" aria-live="polite"></div>
+        <p id="amountPanelTotal" class="inline-total">Selected total: 0</p>
+        <div id="amountEditor" class="editor hidden" aria-hidden="true">
+          <form id="amountAddForm" class="editor-form">
+            <label class="field">
+              <span>Custom amount</span>
+              <input id="newAmountInput" name="amount" type="number" inputmode="numeric" min="0" step="1" placeholder="Enter amount" required>
+            </label>
+            <button class="primary-button" type="submit">Add Amount</button>
+          </form>
+          <div id="amountEditList" class="editor-list"></div>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="categoryPanelHeading">
+        <div class="panel-header">
+          <div>
+            <p class="panel-label">Section 2</p>
+            <h2 id="categoryPanelHeading">Category</h2>
+          </div>
+          <button id="toggleCategoryEdit" class="icon-button" type="button" aria-expanded="false" aria-controls="categoryEditor">
+            <span aria-hidden="true">✎</span>
+            <span>Edit</span>
+          </button>
+        </div>
+        <div id="categoryButtons" class="chip-grid category-grid" aria-live="polite"></div>
+        <div id="categoryEditor" class="editor hidden" aria-hidden="true">
+          <form id="categoryAddForm" class="editor-form">
+            <label class="field">
+              <span>New category</span>
+              <input id="newCategoryInput" name="category" type="text" maxlength="24" placeholder="Enter category" required>
+            </label>
+            <button class="primary-button" type="submit">Add Category</button>
+          </form>
+          <div id="categoryEditList" class="editor-list"></div>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="locationPanelHeading">
+        <div class="panel-header">
+          <div>
+            <p class="panel-label">Section 3</p>
+            <h2 id="locationPanelHeading">Location</h2>
+          </div>
+        </div>
+        <div class="location-card">
+          <p id="locationStatus" class="status-text">Location not requested yet.</p>
+          <div class="location-actions">
+            <button id="fetchLocationButton" class="primary-button" type="button">Use Current Location</button>
+            <button id="copyLocationButton" class="ghost-button" type="button" disabled>Copy Link</button>
+          </div>
+          <label class="field">
+            <span>Google Maps URL</span>
+            <textarea id="locationOutput" rows="3" readonly placeholder="https://www.google.com/maps?q=latitude,longitude"></textarea>
+          </label>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <template id="rippleTemplate">
+    <span class="ripple"></span>
+  </template>
+
+  <script src="app.js"></script>
+</body>
+</html>
