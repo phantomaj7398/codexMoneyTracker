@@ -155,7 +155,6 @@ function renderAmounts() {
     button.dataset.amount = String(amount);
     button.innerHTML = `
       <span class="chip-value">${formatCurrency(amount)}</span>
-      <span class="chip-subtitle">${count > 0 ? "Tap to add more" : "Tap to add"}</span>
       ${count > 0 ? `<span class="chip-badge">×${count}</span>` : ""}
     `;
     button.addEventListener("click", () => {
@@ -189,7 +188,6 @@ function renderCategories() {
     button.dataset.category = category;
     button.innerHTML = `
       <span class="chip-value">${escapeHtml(category)}</span>
-      <span class="chip-subtitle">${selected ? "Selected" : "Tap to select"}</span>
     `;
     button.addEventListener("click", () => {
       animateTap(button);
@@ -403,8 +401,10 @@ function fetchLocation() {
     },
     (error) => {
       const message = error.code === error.PERMISSION_DENIED
-        ? "Location access was denied. You can still use the app without it."
-        : "Unable to fetch location right now. Try again when your connection and GPS are stable.";
+        ? "Location access was denied. Allow location permission in the browser if you want the Maps link."
+        : window.isSecureContext
+          ? "Unable to fetch location right now. Check GPS, browser permission, and try again."
+          : "Location needs a secure context. Open the app over HTTPS or localhost to use geolocation.";
       elements.locationStatus.textContent = message;
       elements.fetchLocationButton.disabled = false;
       state.locationUrl = "";
