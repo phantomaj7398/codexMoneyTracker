@@ -6,8 +6,8 @@
   <meta name="theme-color" content="#0f172a">
   <meta name="description" content="Fast offline-first money tracker with customizable amount and category panels.">
   <link rel="manifest" href="manifest.json">
-  <link rel="icon" href="icons/icon-192.png" type="image/png">
-  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="icon" href="icons/icon-192.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon-192.svg">
   <link rel="stylesheet" href="style.css">
   <title>Money Tracker</title>
 </head>
@@ -23,7 +23,7 @@
     </header>
 
     <main class="stack">
-      <section class="panel accent-panel" aria-labelledby="totalHeading">
+	      <section class="panel accent-panel" aria-labelledby="totalHeading">
         <div class="panel-header">
           <div>
             <p class="panel-label">Current session</p>
@@ -41,7 +41,53 @@
             <span id="selectedCategoryText">No category selected.</span>
           </div>
         </div>
-      </section>
+	      </section>
+
+	      <section id="sharedTransactionPanel" class="panel share-panel hidden" aria-labelledby="sharedTransactionHeading">
+	        <div class="panel-header">
+	          <div>
+	            <p class="panel-label">Shared screenshot</p>
+	            <h2 id="sharedTransactionHeading">Transaction Import</h2>
+	          </div>
+	          <span id="ocrProgress" class="progress-pill">Waiting</span>
+	        </div>
+	        <div class="shared-layout">
+	          <div class="image-preview-wrap">
+	            <img id="sharedImagePreview" class="image-preview" alt="Shared transaction screenshot preview">
+	          </div>
+	          <form id="transactionForm" class="transaction-form">
+	            <label class="field">
+	              <span>Amount</span>
+	              <input id="transactionAmount" name="amount" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0">
+	            </label>
+	            <label class="field">
+	              <span>Receiver Name</span>
+	              <input id="transactionReceiver" name="receiver" type="text" placeholder="Receiver name">
+	            </label>
+	            <label class="field">
+	              <span>UPI ID</span>
+	              <input id="transactionUpiId" name="upiId" type="text" placeholder="name@bank">
+	            </label>
+	            <label class="field">
+	              <span>Transaction ID</span>
+	              <input id="transactionId" name="transactionId" type="text" placeholder="Transaction ID">
+	            </label>
+	            <label class="field">
+	              <span>UTR Number</span>
+	              <input id="transactionUtr" name="utr" type="text" inputmode="numeric" placeholder="UTR">
+	            </label>
+	            <label class="field">
+	              <span>Date and Time</span>
+	              <input id="transactionDatetime" name="datetime" type="text" placeholder="Date and time">
+	            </label>
+	            <p id="ocrStatus" class="status-text">Reading shared image...</p>
+	            <div class="location-actions">
+	              <button id="saveTransactionButton" class="primary-button" type="submit">Save</button>
+	              <button id="clearSharedTransactionButton" class="ghost-button" type="button">Dismiss</button>
+	            </div>
+	          </form>
+	        </div>
+	      </section>
 
       <section class="panel" aria-labelledby="amountPanelHeading">
         <div class="panel-header">
@@ -118,6 +164,7 @@
     <span class="ripple"></span>
   </template>
 
-  <script src="app.js"></script>
+	  <script src="vendor/tesseract/tesseract.min.js"></script>
+	  <script src="app.js"></script>
 </body>
 </html>

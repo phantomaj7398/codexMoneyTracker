@@ -134,6 +134,7 @@ h2 {
 
 .total-card,
 .location-card,
+.image-preview-wrap,
 .editor {
   background: var(--surface-soft);
   border: 1px solid rgba(148, 163, 184, 0.14);
@@ -271,6 +272,12 @@ h2 {
   background: linear-gradient(135deg, var(--brand), #8ff7df);
 }
 
+.share-link {
+  display: inline-flex;
+  justify-content: center;
+  text-decoration: none;
+}
+
 .icon-button {
   display: inline-flex;
   align-items: center;
@@ -358,6 +365,46 @@ h2 {
   gap: 10px;
 }
 
+.share-panel {
+  border-color: rgba(94, 234, 212, 0.34);
+}
+
+.shared-layout,
+.transaction-form {
+  display: grid;
+  gap: 12px;
+}
+
+.image-preview-wrap {
+  padding: 8px;
+}
+
+.image-preview {
+  display: block;
+  width: 100%;
+  max-height: 420px;
+  object-fit: contain;
+  border-radius: var(--radius-sm);
+  background: rgba(2, 6, 23, 0.35);
+}
+
+.progress-pill {
+  min-width: 86px;
+  padding: 7px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(94, 234, 212, 0.22);
+  color: var(--brand);
+  background: rgba(8, 17, 31, 0.68);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-align: center;
+}
+
+.progress-pill.is-error {
+  color: #ffd7de;
+  border-color: rgba(251, 113, 133, 0.28);
+}
+
 #locationOutput {
   resize: none;
 }
@@ -391,9 +438,14 @@ h2 {
     grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 
-  .editor-form,
-  .location-actions {
-    grid-template-columns: 1fr auto;
-    align-items: end;
-  }
-}
+	  .editor-form,
+	  .location-actions {
+	    grid-template-columns: 1fr auto;
+	    align-items: end;
+	  }
+
+	  .shared-layout {
+	    grid-template-columns: minmax(220px, 0.8fr) 1fr;
+	    align-items: start;
+	  }
+	}

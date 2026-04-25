@@ -4,7 +4,11 @@ const STORAGE_KEYS = {
   amounts: "moneyTracker.amounts",
   categories: "moneyTracker.categories",
   session: "moneyTracker.session",
+  transactions: "moneyTracker.transactions",
 };
+const SHARE_DB_NAME = "moneyTrackerShareDb";
+const SHARE_STORE_NAME = "sharedImages";
+const SHARED_IMAGE_ID = "latest";
 
 const state = {
   amounts: loadList(STORAGE_KEYS.amounts, DEFAULT_AMOUNTS, normalizeAmountList),
@@ -15,6 +19,9 @@ const state = {
   amountEditOpen: false,
   categoryEditOpen: false,
   installPrompt: null,
+  sharedTransaction: null,
+  sharedImage: "",
+  ocrText: "",
 };
 
 const elements = {
@@ -41,6 +48,18 @@ const elements = {
   locationStatus: document.getElementById("locationStatus"),
   installButton: document.getElementById("installButton"),
   rippleTemplate: document.getElementById("rippleTemplate"),
+  sharedTransactionPanel: document.getElementById("sharedTransactionPanel"),
+  sharedImagePreview: document.getElementById("sharedImagePreview"),
+  transactionForm: document.getElementById("transactionForm"),
+  transactionAmount: document.getElementById("transactionAmount"),
+  transactionReceiver: document.getElementById("transactionReceiver"),
+  transactionUpiId: document.getElementById("transactionUpiId"),
+  transactionId: document.getElementById("transactionId"),
+  transactionUtr: document.getElementById("transactionUtr"),
+  transactionDatetime: document.getElementById("transactionDatetime"),
+  ocrProgress: document.getElementById("ocrProgress"),
+  ocrStatus: document.getElementById("ocrStatus"),
+  clearSharedTransactionButton: document.getElementById("clearSharedTransactionButton"),
 };
 
 initializeSession();
@@ -49,6 +68,7 @@ render();
 registerServiceWorker();
 prepareInstallFlow();
 maybeAutoFetchLocation();
+handleSharedImageFlow();
 
 function bindEvents() {
   elements.clearAllButton.addEventListener("click", () => {
@@ -107,6 +127,8 @@ function bindEvents() {
   elements.fetchLocationButton.addEventListener("click", fetchLocation);
   elements.copyLocationButton.addEventListener("click", copyLocation);
   elements.installButton.addEventListener("click", installApp);
+  elements.transactionForm.addEventListener("submit", saveSharedTransaction);
+  elements.clearSharedTransactionButton.addEventListener("click", clearSharedTransaction);
 }
 
 function initializeSession() {
@@ -479,11 +501,291 @@ async function installApp() {
 function registerServiceWorker() {
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {
-      navigator.serviceWorker.register("sw.js").catch(() => {
+      navigator.serviceWorker.register("service-worker.js").catch(() => {
         // Silent failure keeps the tracker usable even if service worker registration fails.
       });
     });
   }
+}
+
+async function handleSharedImageFlow() {
+  const query = new URLSearchParams(window.location.search);
+  if (!query.has("fromShare")) {
+    return;
+  }
+
+  showSharedTransactionPanel();
+  setOcrStatus("Loading shared image...", "Waiting");
+
+  try {
+    const sharedImage = await getSharedImage();
+    if (!sharedImage?.image) {
+      setOcrStatus("No shared image was found. You can try sharing the screenshot again.", "Missing", true);
+      return;
+    }
+
+    state.sharedImage = sharedImage.image;
+    state.sharedTransaction = createEmptyTransaction(state.sharedImage);
+    elements.sharedImagePreview.src = state.sharedImage;
+    fillTransactionForm(state.sharedTransaction);
+    await runOcrForSharedImage(state.sharedImage);
+  } catch (error) {
+    setOcrStatus("The shared image could not be loaded. You can still import another screenshot.", "Error", true);
+  }
+}
+
+function showSharedTransactionPanel() {
+  elements.sharedTransactionPanel.classList.remove("hidden");
+  elements.sharedTransactionPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+async function runOcrForSharedImage(image) {
+  if (!window.Tesseract?.recognize) {
+    setOcrStatus("OCR library is unavailable. The image is ready for manual entry.", "Manual", true);
+    return;
+  }
+
+  setOcrStatus("Running OCR...", "0%");
+
+  try {
+    const result = await Tesseract.recognize(image, "eng", {
+      workerPath: "vendor/tesseract/worker.min.js",
+      corePath: "vendor/tesseract/tesseract-core.wasm.js",
+      langPath: "vendor/tesseract",
+      logger: (message) => {
+        if (message.status === "recognizing text" && Number.isFinite(message.progress)) {
+          setOcrStatus("Reading text from screenshot...", `${Math.round(message.progress * 100)}%`);
+        }
+      },
+    });
+
+    state.ocrText = result.data?.text ?? "";
+    const extracted = extractTransactionData(state.ocrText, image);
+    state.sharedTransaction = { ...state.sharedTransaction, ...extracted, image };
+    fillTransactionForm(state.sharedTransaction);
+    setOcrStatus("Review the extracted details before saving.", "Ready");
+  } catch (error) {
+    setOcrStatus("OCR failed. The image is still available for manual correction.", "Manual", true);
+  }
+}
+
+function extractTransactionData(text, image) {
+  const normalized = normalizeOcrText(text);
+  const lines = normalized.split("\n").map((line) => line.trim()).filter(Boolean);
+  const upiId = findUpiId(normalized);
+  const amount = findAmount(normalized);
+  const transactionId = findTransactionId(normalized);
+  const utr = findUtr(normalized);
+  const datetime = findDatetime(normalized);
+  const receiver = findReceiver(lines, upiId);
+
+  return {
+    amount,
+    receiver,
+    upiId,
+    transactionId,
+    utr,
+    datetime,
+    image,
+  };
+}
+
+function normalizeOcrText(text) {
+  return String(text ?? "")
+    .replace(/\r/g, "\n")
+    .replace(/[|]/g, "I")
+    .replace(/[₹]/g, "₹")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n{2,}/g, "\n")
+    .trim();
+}
+
+function findAmount(text) {
+  const patterns = [
+    /(?:₹|Rs\.?|INR)\s*([0-9][0-9,]*(?:\.\d{1,2})?)/i,
+    /\b([0-9][0-9,]*(?:\.\d{1,2})?)\s*(?:₹|Rs\.?|INR)\b/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match) {
+      return Number(match[1].replace(/,/g, ""));
+    }
+  }
+
+  return 0;
+}
+
+function findUpiId(text) {
+  const match = text.match(/\b[a-z0-9._-]{2,}@[a-z][a-z0-9.-]{2,}\b/i);
+  return match?.[0] ?? "";
+}
+
+function findTransactionId(text) {
+  const labelled = text.match(/transaction\s*(?:id|no\.?|number)?\s*[:#-]?\s*([A-Z]?\d{10,}|T[A-Z0-9]{10,})/i);
+  if (labelled) {
+    return labelled[1];
+  }
+
+  const fallback = text.match(/\bT[A-Z0-9]{12,}\b/i);
+  return fallback?.[0] ?? "";
+}
+
+function findUtr(text) {
+  const labelled = text.match(/\bUTR\s*[:#-]?\s*([0-9]{8,})\b/i);
+  if (labelled) {
+    return labelled[1];
+  }
+
+  const longNumbers = [...text.matchAll(/\b[0-9]{10,18}\b/g)].map((match) => match[0]);
+  const transactionId = findTransactionId(text);
+  return longNumbers.find((value) => !transactionId.includes(value)) ?? "";
+}
+
+function findDatetime(text) {
+  const dateLine = text.match(/\b\d{1,2}[:.]\d{2}\s*(?:am|pm)?\s*(?:on)?\s*\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4}\b/i);
+  if (dateLine) {
+    return dateLine[0].replace(/\s+/g, " ");
+  }
+
+  const dateFirst = text.match(/\b\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4}[, ]+\d{1,2}[:.]\d{2}\s*(?:am|pm)?\b/i);
+  return dateFirst?.[0].replace(/\s+/g, " ") ?? "";
+}
+
+function findReceiver(lines, upiId) {
+  const paidToIndex = lines.findIndex((line) => /paid\s+to/i.test(line));
+  if (paidToIndex >= 0) {
+    for (const line of lines.slice(paidToIndex + 1, paidToIndex + 5)) {
+      if (isLikelyReceiverName(line)) {
+        return cleanReceiverName(line);
+      }
+    }
+  }
+
+  if (upiId) {
+    const upiLineIndex = lines.findIndex((line) => line.includes(upiId));
+    for (let index = upiLineIndex - 1; index >= Math.max(0, upiLineIndex - 3); index -= 1) {
+      if (isLikelyReceiverName(lines[index])) {
+        return cleanReceiverName(lines[index]);
+      }
+    }
+  }
+
+  return "";
+}
+
+function isLikelyReceiverName(line) {
+  const cleaned = cleanReceiverName(line);
+  return /^[A-Za-z][A-Za-z .'-]{2,}$/.test(cleaned)
+    && !/(transaction|transfer|details|paid|debited|powered|successful|bank|utr|id)/i.test(cleaned);
+}
+
+function cleanReceiverName(line) {
+  return String(line ?? "").replace(/[^A-Za-z .'-]/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function fillTransactionForm(transaction) {
+  elements.transactionAmount.value = transaction.amount || "";
+  elements.transactionReceiver.value = transaction.receiver || "";
+  elements.transactionUpiId.value = transaction.upiId || "";
+  elements.transactionId.value = transaction.transactionId || "";
+  elements.transactionUtr.value = transaction.utr || "";
+  elements.transactionDatetime.value = transaction.datetime || "";
+}
+
+async function saveSharedTransaction(event) {
+  event.preventDefault();
+
+  const entry = {
+    amount: Number(elements.transactionAmount.value) || 0,
+    receiver: elements.transactionReceiver.value.trim(),
+    upiId: elements.transactionUpiId.value.trim(),
+    transactionId: elements.transactionId.value.trim(),
+    utr: elements.transactionUtr.value.trim(),
+    datetime: elements.transactionDatetime.value.trim(),
+    image: state.sharedImage,
+  };
+
+  const entries = loadTransactions();
+  entries.unshift(entry);
+  localStorage.setItem(STORAGE_KEYS.transactions, JSON.stringify(entries));
+  try {
+    await deleteSharedImage();
+  } catch (error) {
+    // The saved entry already contains the image; stale handoff data can be replaced by the next share.
+  }
+  state.sharedTransaction = entry;
+  setOcrStatus("Transaction saved on this device.", "Saved");
+  vibrate([12, 8, 12]);
+}
+
+async function clearSharedTransaction() {
+  try {
+    await deleteSharedImage();
+  } catch (error) {
+    // Dismissal should still clear the visible import panel if IndexedDB cleanup fails.
+  }
+  state.sharedTransaction = null;
+  state.sharedImage = "";
+  state.ocrText = "";
+  elements.sharedTransactionPanel.classList.add("hidden");
+  elements.sharedImagePreview.removeAttribute("src");
+  fillTransactionForm(createEmptyTransaction(""));
+  setOcrStatus("Waiting for a shared image.", "Waiting");
+}
+
+function createEmptyTransaction(image) {
+  return {
+    amount: 0,
+    receiver: "",
+    upiId: "",
+    transactionId: "",
+    utr: "",
+    datetime: "",
+    image,
+  };
+}
+
+function setOcrStatus(message, progress, isError = false) {
+  elements.ocrStatus.textContent = message;
+  elements.ocrProgress.textContent = progress;
+  elements.ocrProgress.classList.toggle("is-error", isError);
+}
+
+function loadTransactions() {
+  const parsed = safeParse(localStorage.getItem(STORAGE_KEYS.transactions));
+  return Array.isArray(parsed) ? parsed : [];
+}
+
+async function getSharedImage() {
+  const db = await openShareDb();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(SHARE_STORE_NAME, "readonly");
+    const request = transaction.objectStore(SHARE_STORE_NAME).get(SHARED_IMAGE_ID);
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function deleteSharedImage() {
+  const db = await openShareDb();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(SHARE_STORE_NAME, "readwrite");
+    const request = transaction.objectStore(SHARE_STORE_NAME).delete(SHARED_IMAGE_ID);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}
+
+function openShareDb() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(SHARE_DB_NAME, 1);
+    request.onupgradeneeded = () => {
+      request.result.createObjectStore(SHARE_STORE_NAME, { keyPath: "id" });
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
 }
 
 function animateTap(button) {
