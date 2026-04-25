@@ -1,4 +1,4 @@
-const CACHE_NAME = "money-tracker-v2";
+const CACHE_NAME = "money-tracker-v3";
 const SHARE_DB_NAME = "moneyTrackerShareDb";
 const SHARE_STORE_NAME = "sharedImages";
 const SHARED_IMAGE_ID = "latest";
@@ -9,8 +9,9 @@ const APP_ASSETS = [
   "./style.css",
   "./app.js",
   "./manifest.json",
-  "./icons/icon-192.svg",
-  "./icons/icon-512.svg",
+  "./icons/icon-192.png",
+  "./icons/icon-512.png",
+  "./screenshots/home.png",
   "./vendor/tesseract/tesseract.min.js",
   "./vendor/tesseract/worker.min.js",
   "./vendor/tesseract/tesseract-core.wasm.js",
